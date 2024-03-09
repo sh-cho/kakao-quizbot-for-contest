@@ -1,0 +1,4 @@
+[env]
+# secrets (local only)
+PRESHARED_AUTH_HEADER_KEY="X-TEMP-HEADER"
+PRESHARED_AUTH_HEADER_VALUE="abde"
