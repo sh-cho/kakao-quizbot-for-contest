@@ -1,21 +1,30 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
+use serde_with::serde_as;
+use crate::game::state::GroupKey;
+use crate::web::model::ChatIdType;
 
 pub type Result<T> = core::result::Result<T, Error>;
 
+#[serde_as]
 #[derive(Clone, Debug, Serialize, strum_macros::AsRefStr)]
 #[serde(tag = "type", content = "data")]
 pub enum Error {
     // -- Sys
     ConfigMissingEnv(&'static str),
     RedisConnectionGetFail,
+    RedisCommandFail(String), // key
 
-    // -- Auth
+    // -- Bot
     AuthFail,
+    ChatTypeNotSupported(ChatIdType),
     
     // -- Game
-    GameCommandParseFail,
+    GameCommandParseFail(String),  // utterance
+    GameNotFound(GroupKey),
+    GameAlreadyStarted(GroupKey),
+    GameAlreadyFinished(GroupKey),
 }
 
 impl std::fmt::Display for Error {

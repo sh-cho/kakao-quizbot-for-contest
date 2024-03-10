@@ -10,7 +10,9 @@ async-trait = "0.1.77"
 axum = "0.7.4"
 bb8 = "0.8.3"
 bb8-redis = "0.14.0"
+csv = "1.3.0"
 kakao-rs = "0.3.6"
+rand = "0.8.5"
 redis = { version = "0.24.0", features = ["tokio-comp"] }
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"

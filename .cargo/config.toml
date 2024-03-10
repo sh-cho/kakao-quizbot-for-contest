@@ -1,4 +1,7 @@
 [env]
+RUST_LOG="kakao_quizbot=debug"
+
 # secrets (local only)
 PRESHARED_AUTH_HEADER_KEY="X-TEMP-HEADER"
 PRESHARED_AUTH_HEADER_VALUE="abde"
+REDIS_CONNECTION_STRING="redis://:VINCE_JJANG@127.0.0.1:6379/"

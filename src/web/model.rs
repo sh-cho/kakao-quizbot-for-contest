@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// bot proxy -> skill server payload
 /// skipped unused fields
@@ -28,7 +28,7 @@ pub struct Chat {
     pub type_: ChatIdType,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum ChatIdType {
     BotGroupKey,

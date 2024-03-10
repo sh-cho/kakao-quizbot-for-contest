@@ -16,6 +16,7 @@ pub fn config() -> &'static Config {
 pub struct Config {
     pub PRESHARED_AUTH_HEADER_KEY: String,
     pub PRESHARED_AUTH_HEADER_VALUE: String,
+    pub REDIS_CONNECTION_STRING: String,
 }
 
 impl Config {
@@ -23,6 +24,7 @@ impl Config {
         Ok(Config {
             PRESHARED_AUTH_HEADER_KEY: get_env("PRESHARED_AUTH_HEADER_KEY")?,
             PRESHARED_AUTH_HEADER_VALUE: get_env("PRESHARED_AUTH_HEADER_VALUE")?,
+            REDIS_CONNECTION_STRING: get_env("REDIS_CONNECTION_STRING")?,
         })
     }
 }
