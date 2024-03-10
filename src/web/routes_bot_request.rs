@@ -19,7 +19,7 @@ pub fn routes(
         .with_state(gm)
 }
 
-async fn bot_request(
+pub async fn bot_request(
     State(gm): State<GameManager>,
     Json(payload): Json<BotRequest>,
 ) -> Result<Json<Template>> {
@@ -57,7 +57,7 @@ async fn bot_request(
                     response.add_output(SimpleText::new("땡").build());
                 }
             }
-        
+
             // TODO: next quiz
         }
         Command::Ranking => {

@@ -37,11 +37,11 @@ pub struct GameManager {
 }
 
 impl GameManager {
-    pub fn new(pool: RedisConnectionPool) -> Self {
-        Self {
+    pub fn new(pool: RedisConnectionPool) -> Result<Self> {
+        Ok(Self {
             games: Arc::new(RwLock::new(HashMap::new())),
             pool,
-        }
+        })
     }
 
     pub async fn start_game(&self, group_key: GroupKey) -> Result<Game> {
@@ -69,8 +69,6 @@ impl GameManager {
             .ok_or(Error::GameNotFound(group_key.clone()))?;
 
         let mut game = game.lock().unwrap();
-            // .map_err(|_| Error::GameNotFound(group_key.clone()))?;
-
         if game.current_quiz.answer != answer {
             return Ok(AnswerResult::Wrong);
         }
@@ -91,10 +89,10 @@ impl GameManager {
             .await
             .map_err(|_| Error::RedisCommandFail(redis_key.clone()))?;
 
-        // let redis_key = format!("group:{}", group_key);
-        // let _: () = conn.incr(redis_key.clone(), 1)
-        //     .await
-        //     .map_err(|_| Error::RedisCommandFail(redis_key.clone()))?;
+        let redis_key = format!("group:{}", group_key);
+        let _: () = conn.incr(redis_key.clone(), 1)
+            .await
+            .map_err(|_| Error::RedisCommandFail(redis_key.clone()))?;
         
         // hget
         let score: i64 = conn.get(redis_key.clone()).await

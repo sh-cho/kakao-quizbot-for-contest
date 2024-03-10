@@ -7,6 +7,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::config::config;
 use crate::game::db::quiz_db;
+use crate::game::state::GameManager;
 
 pub use self::error::{Error, Result};
 
@@ -37,8 +38,9 @@ async fn main() -> Result<()> {
     }
     debug!("{:<12} - successfully connected to redis and pinged it", "MAIN");
 
+    let gm = GameManager::new(pool).unwrap();
     let app = Router::new()
-        .merge(web::routes_bot_request::routes(game::state::GameManager::new(pool.clone())))
+        .merge(web::routes_bot_request::routes(gm.clone()))
         .layer(middleware::from_fn(web::mw_auth::mw_header_checker));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
