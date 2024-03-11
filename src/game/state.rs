@@ -66,7 +66,7 @@ impl GameManager {
         Ok(())
     }
     
-    // 
+    
     pub async fn try_answer_inmemory(&self, user_id: &str, group_key: &GroupKey, answer: &str) -> Result<AnswerResult> {
         let games = self.games.read().await;
         let game = games.get(group_key)
@@ -77,23 +77,29 @@ impl GameManager {
             return Ok(AnswerResult::Wrong);
         }
         
-        game.current_round += 1;
-        game.current_quiz = quiz_db().get_random_quiz();
-        
         // scores
         let mut scores_by_user = SCORES_BY_USER.lock().unwrap();
         let mut scores_by_group = SCORES_BY_GROUP.lock().unwrap();
         
         *scores_by_user.entry(user_id.to_string()).or_insert(0) += 1;
         *scores_by_group.entry(group_key.clone()).or_insert(0) += 1;
+
+        let current_quiz = game.current_quiz.clone();
         
+        game.current_round += 1;
+        game.current_quiz = quiz_db().get_random_quiz();
+
         // TODO: rank
+        
         Ok(AnswerResult::Correct {
             user_id: user_id.to_string(),
             score: *scores_by_user.get(user_id).unwrap(),
+            current_quiz,
+            next_quiz: game.current_quiz.clone(),
+            current_round: game.current_round,
         })
     }
-
+    
     // // TODO: race cond?
     // pub async fn try_answer_with_redis(&self, user_id: String, group_key: GroupKey, answer: String) -> Result<AnswerResult> {
     //     let games = self.games.read().await;
@@ -172,12 +178,13 @@ impl GameManager {
 // max time per round: 60 seconds
 // max rounds: 10
 // 굳이 남겨놓지 않는게 좋을듯.
-const MAX_ROUNDS: u8 = 10;
+// pub const MAX_ROUNDS: u8 = 10;
+pub const MAX_ROUNDS: u8 = 3;
 
 #[derive(Clone)]
 pub struct Game {
     group_key: GroupKey,
-    current_round: u8,
+    pub current_round: u8,
     pub current_quiz: &'static Quiz,
 }
 
@@ -185,7 +192,7 @@ impl Game {
     pub fn new(group_key: GroupKey) -> Self {
         Self {
             group_key,
-            current_round: 0,
+            current_round: 1,
             current_quiz: quiz_db().get_random_quiz(),
         }
     }
@@ -196,6 +203,9 @@ pub enum AnswerResult {
         user_id: String,
         // NOTE: redis integer is i64, but for now it's enough to use u32
         score: u32,
+        current_quiz: &'static Quiz,
+        next_quiz: &'static Quiz,
+        current_round: u8,
     },
     Wrong,
 }
@@ -214,8 +224,8 @@ impl Command {
 
         match command {
             "시작" => Some(Command::Start),
-            "중지" => Some(Command::Stop),
-            // TODO: "정답" 명령어를 사용하지 않고, 바로 답 입력하도록
+            "중지" | "중단" | "정지" | "종료" | "그만" | "멈춰" => Some(Command::Stop),
+            // TODO: "정답" 명령어를 사용하지 않고, 바로 답 입력하도록 ?
             "정답" => {
                 let answer = utterance.splitn(2, ' ').nth(1)?;
                 Some(Command::Answer(answer.to_string()))

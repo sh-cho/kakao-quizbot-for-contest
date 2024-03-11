@@ -22,7 +22,7 @@ pub enum Error {
     ChatTypeNotSupported(ChatIdType),
     
     // -- Game
-    GameCommandParseFail(String),  // utterance
+    GameCommandParseFail(&'static str),  // utterance? 보다는 그냥 에러메시지
     GameNotFound(GroupKey),
     GameAlreadyStarted(GroupKey),
     GameAlreadyFinished(GroupKey),
@@ -48,8 +48,15 @@ impl IntoResponse for Error {
         
         // Json<Template>
         let mut template = Template::new();
-        template.add_output(SimpleText::new(format!("err: {self:?}").as_str()).build());
         
+        match self {
+            Error::GameCommandParseFail(help_message) => {
+                template.add_output(SimpleText::new(help_message).build());
+            }
+            _ => {
+                template.add_output(SimpleText::new(format!("err: {self:?}").as_str()).build());
+            }
+        }
         
         // for now, just return 200 with template body
         Response::builder()
