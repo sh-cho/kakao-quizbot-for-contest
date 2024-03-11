@@ -38,12 +38,13 @@ async fn main() -> Result<()> {
     }
     debug!("{:<12} - successfully connected to redis and pinged it", "MAIN");
 
-    let gm = GameManager::new(pool).unwrap();
+    let gm = GameManager::new(pool.clone()).unwrap();
     let app = Router::new()
-        .merge(web::routes_bot_request::routes(gm.clone()))
+        .merge(web::routes_bot_request::routes(gm))
         .layer(middleware::from_fn(web::mw_auth::mw_header_checker));
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
+    // let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Listening on: {:?}", listener.local_addr());
     axum::serve(listener, app).await.unwrap();
 

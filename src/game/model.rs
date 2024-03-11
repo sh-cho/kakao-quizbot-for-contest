@@ -10,7 +10,7 @@ pub struct Quiz {
 
 impl Quiz {
     pub fn info_before(&self) -> String {
-        format!("({}) Q. {}", self.category, self.question)
+        format!("({})\n{}", self.category, self.question)
     }
     
     pub fn info_after(&self) -> String {

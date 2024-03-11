@@ -22,7 +22,7 @@ use crate::{Error, Result};
 use crate::conn::RedisConnectionPool;
 use crate::game::db::quiz_db;
 use crate::game::model::Quiz;
-use crate::game::state::AnswerResult::Correct;
+use crate::game::temp_inmemory_db::{SCORES_BY_GROUP, SCORES_BY_USER};
 
 pub type GroupKey = String;
 
@@ -33,14 +33,17 @@ const REDIS_GROUP_SCORES_KEY: &str = "group_scores";
 #[derive(Clone)]
 pub struct GameManager {
     games: Arc<RwLock<HashMap<GroupKey, Mutex<Game>>>>,
-    pool: RedisConnectionPool,
+    
+    // pool: RedisConnectionPool,  // to-be-done
+    
+    // for now, just use static
 }
 
 impl GameManager {
     pub fn new(pool: RedisConnectionPool) -> Result<Self> {
         Ok(Self {
             games: Arc::new(RwLock::new(HashMap::new())),
-            pool,
+            // pool,
         })
     }
 
@@ -48,10 +51,11 @@ impl GameManager {
         let mut games = self.games.write().await;
         let game = Game::new(group_key.clone());
 
-        games.insert(group_key.clone(), Mutex::new(game.clone()))
-            .ok_or(Error::GameAlreadyStarted(group_key))?;
-
-        Ok(game)
+        let prev = games.insert(group_key.clone(), Mutex::new(game.clone()));
+        match prev {
+            Some(_) => Err(Error::GameAlreadyStarted(group_key)),
+            None => Ok(game),
+        }
     }
 
     pub async fn stop_game(&self, group_key: GroupKey) -> Result<()> {
@@ -61,69 +65,107 @@ impl GameManager {
 
         Ok(())
     }
-
-    // TODO: race cond?
-    pub async fn try_answer(&self, user_id: String, group_key: GroupKey, answer: String) -> Result<AnswerResult> {
+    
+    // 
+    pub async fn try_answer_inmemory(&self, user_id: &str, group_key: &GroupKey, answer: &str) -> Result<AnswerResult> {
         let games = self.games.read().await;
-        let game = games.get(&group_key)
+        let game = games.get(group_key)
             .ok_or(Error::GameNotFound(group_key.clone()))?;
-
+        
         let mut game = game.lock().unwrap();
         if game.current_quiz.answer != answer {
             return Ok(AnswerResult::Wrong);
         }
-
+        
         game.current_round += 1;
         game.current_quiz = quiz_db().get_random_quiz();
-
-        // +1
-        // TODO: use pipeline
-        let mut conn = self.pool.get()
-            .await
-            .map_err(|_| Error::RedisConnectionGetFail)?;
-
-        // scores
-        // XXX: `user_id` is different in different chat, so...
-        let redis_key = format!("user:{}", user_id.clone());
-        let _: () = conn.incr(redis_key.clone(), 1)
-            .await
-            .map_err(|_| Error::RedisCommandFail(redis_key.clone()))?;
-
-        let redis_key = format!("group:{}", group_key);
-        let _: () = conn.incr(redis_key.clone(), 1)
-            .await
-            .map_err(|_| Error::RedisCommandFail(redis_key.clone()))?;
         
-        // hget
-        let score: i64 = conn.get(redis_key.clone()).await
-            .map_err(|_| Error::RedisCommandFail(redis_key.clone()))?;
-
-        // ranks
-        conn.zadd(REDIS_USER_SCORES_KEY, user_id.clone(), score).await
-            .map_err(|_| Error::RedisCommandFail(REDIS_USER_SCORES_KEY.to_string()))?;
-        conn.zadd(REDIS_GROUP_SCORES_KEY, group_key, score).await
-            .map_err(|_| Error::RedisCommandFail(REDIS_GROUP_SCORES_KEY.to_string()))?;
-
-        Ok(Correct {
-            user_id,
-            // score: score as u32,
-            score: 1,
+        // scores
+        let mut scores_by_user = SCORES_BY_USER.lock().unwrap();
+        let mut scores_by_group = SCORES_BY_GROUP.lock().unwrap();
+        
+        *scores_by_user.entry(user_id.to_string()).or_insert(0) += 1;
+        *scores_by_group.entry(group_key.clone()).or_insert(0) += 1;
+        
+        // TODO: rank
+        Ok(AnswerResult::Correct {
+            user_id: user_id.to_string(),
+            score: *scores_by_user.get(user_id).unwrap(),
         })
     }
+
+    // // TODO: race cond?
+    // pub async fn try_answer_with_redis(&self, user_id: String, group_key: GroupKey, answer: String) -> Result<AnswerResult> {
+    //     let games = self.games.read().await;
+    //     let game = games.get(&group_key)
+    //         .ok_or(Error::GameNotFound(group_key.clone()))?;
+    //
+    //     let mut game = game.lock().unwrap();
+    //     if game.current_quiz.answer != answer {
+    //         return Ok(AnswerResult::Wrong);
+    //     }
+    //
+    //     game.current_round += 1;
+    //     game.current_quiz = quiz_db().get_random_quiz();
+    //
+    //     // +1
+    //     // TODO: use pipeline
+    //     let mut conn = self.pool.get()
+    //         .await
+    //         .map_err(|_| Error::RedisConnectionGetFail)?;
+    //
+    //     // let conn = self.pool.
+    //     // let pool = self.pool.clone();
+    //     // let conn = pool.get();
+    //     //
+    //     // conn.await.unwrap();
+    //
+    //     // scores
+    //     // XXX: `user_id` is different in different chat, so...
+    //     let redis_key = format!("user:{}", user_id.clone());
+    //     let _: () = conn.incr(redis_key.clone(), 1)
+    //         .await
+    //         .map_err(|_| Error::RedisCommandFail(redis_key.clone()))?;
+    //
+    //     let redis_key = format!("group:{}", group_key);
+    //     let _: () = conn.incr(redis_key.clone(), 1)
+    //         .await
+    //         .map_err(|_| Error::RedisCommandFail(redis_key.clone()))?;
+    //
+    //     // hget
+    //     let score: i64 = conn.get(redis_key.clone()).await
+    //         .map_err(|_| Error::RedisCommandFail(redis_key.clone()))?;
+    //
+    //     // ranks
+    //     conn.zadd(REDIS_USER_SCORES_KEY, user_id.clone(), score).await
+    //         .map_err(|_| Error::RedisCommandFail(REDIS_USER_SCORES_KEY.to_string()))?;
+    //     conn.zadd(REDIS_GROUP_SCORES_KEY, group_key, score).await
+    //         .map_err(|_| Error::RedisCommandFail(REDIS_GROUP_SCORES_KEY.to_string()))?;
+    //
+    //     // Ok(Correct {
+    //     //     user_id,
+    //     //     // score: score as u32,
+    //     //     score: 1,
+    //     // })
+    //
+    //     todo!()
+    // }
 
     // Return user ranking and group ranking, using ZRANK
     // TODO
     pub async fn get_ranking(&self, user_id: &str, group_key: &str) -> Result<(i32, i32)> {
-        let mut conn = self.pool.get()
-            .await
-            .map_err(|_| Error::RedisConnectionGetFail)?;
-
-        let user_rank = conn.zrank(REDIS_USER_SCORES_KEY, user_id).await
-            .map_err(|_| Error::RedisCommandFail(REDIS_USER_SCORES_KEY.to_string()))?;
-        let group_rank = conn.zrank(REDIS_GROUP_SCORES_KEY, group_key).await
-            .map_err(|_| Error::RedisCommandFail(REDIS_GROUP_SCORES_KEY.to_string()))?;
-
-        Ok((user_rank, group_rank))
+        // let mut conn = self.pool.get()
+        //     .await
+        //     .map_err(|_| Error::RedisConnectionGetFail)?;
+        // 
+        // let user_rank = conn.zrank(REDIS_USER_SCORES_KEY, user_id).await
+        //     .map_err(|_| Error::RedisCommandFail(REDIS_USER_SCORES_KEY.to_string()))?;
+        // let group_rank = conn.zrank(REDIS_GROUP_SCORES_KEY, group_key).await
+        //     .map_err(|_| Error::RedisCommandFail(REDIS_GROUP_SCORES_KEY.to_string()))?;
+        // 
+        // Ok((user_rank, group_rank))
+        
+        Ok((123, 123))
     }
 }
 
@@ -178,7 +220,7 @@ impl Command {
                 let answer = utterance.splitn(2, ' ').nth(1)?;
                 Some(Command::Answer(answer.to_string()))
             }
-            "랭킹" => Some(Command::Ranking),
+            "랭킹" | "순위" => Some(Command::Ranking),
             _ => None,
         }
     }

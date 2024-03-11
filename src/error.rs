@@ -1,5 +1,6 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use kakao_rs::prelude::{SimpleText, Template};
 use serde::Serialize;
 use serde_with::serde_as;
 use crate::game::state::GroupKey;
@@ -40,11 +41,22 @@ impl IntoResponse for Error {
         println!("->> {:<12} - {self:?}", "INTO_RES");
 
         // create placeholder axum response
-        let mut response = StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        // let mut response = StatusCode::INTERNAL_SERVER_ERROR.into_response();
 
         // Insert the Error into the repsonse
-        response.extensions_mut().insert(self);
-
-        response
+        // response.extensions_mut().insert(self);
+        
+        // Json<Template>
+        let mut template = Template::new();
+        template.add_output(SimpleText::new(format!("err: {self:?}").as_str()).build());
+        
+        
+        // for now, just return 200 with template body
+        Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&template).unwrap())
+            .unwrap()
+            .into_response()
     }
 }

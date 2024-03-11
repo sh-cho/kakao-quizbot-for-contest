@@ -596,6 +596,7 @@ dependencies = [
  "bb8-redis",
  "csv",
  "kakao-rs",
+ "lazy_static",
  "rand",
  "redis",
  "serde",

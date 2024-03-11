@@ -46,8 +46,8 @@ pub async fn bot_request(
             response.add_output(SimpleText::new("퀴즈게임이 종료되었습니다.").build());
         }
         Command::Answer(answer) => {
-            let result = gm.try_answer(user_id, chat_id, answer).await?;
-
+            let result = gm.try_answer_inmemory(&user_id, &chat_id, &answer).await?;
+        
             match result {
                 game::state::AnswerResult::Correct { user_id, score } => {
                     response.add_output(SimpleText::new(format!("{} 정답! (점수: {})", user_id, score)).build());
@@ -57,12 +57,16 @@ pub async fn bot_request(
                     response.add_output(SimpleText::new("땡").build());
                 }
             }
-
+        
             // TODO: next quiz
         }
         Command::Ranking => {
             let (user_rank, chat_rank) = gm.get_ranking(&user_id, &chat_id).await?;
             response.add_output(SimpleText::new(format!("당신의 순위: {}등\n이 방의 순위: {}등", user_rank, chat_rank)).build());
+        }
+
+        _ => {
+            response.add_output(SimpleText::new("명령어 목록: 시작, 정지, (정답), 순위").build());
         }
     }
 
