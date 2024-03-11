@@ -4,7 +4,7 @@ use axum::routing::post;
 use kakao_rs::prelude::{SimpleText, Template};
 use tracing::debug;
 
-use game::state::Command;
+use crate::web::model::Command;
 
 use crate::{Error, game, Result};
 use crate::game::state::GameManager;
