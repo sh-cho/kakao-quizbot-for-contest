@@ -60,7 +60,7 @@ pub async fn bot_request(
                     current_round
                 } => {
                     // TODO: hash -> nickname?
-                    let mut result_text = format!("👏 {:.6} 정답! (점수: {})", user_id, score);
+                    let mut result_text = format!("👏 {:.6} 정답! (누적 점수: {})", user_id, score);
                     if let Some(comment) = current_quiz.comment.clone() {
                         result_text.push_str(format!("\n{}", comment).as_str());
                     }
@@ -83,7 +83,7 @@ pub async fn bot_request(
         Command::Ranking => {
             // let (user_rank, chat_rank) = gm.get_ranking(&user_id, &chat_id).await?;
             // response.add_output(SimpleText::new(format!("당신의 순위: {}등\n이 방의 순위: {}등", user_rank, chat_rank)).build());
-            
+
             response.add_output(SimpleText::new("🚧 공사중").build());
         }
     }
