@@ -25,7 +25,7 @@ pub enum Error {
     GameCommandParseFail(&'static str),  // utterance? 보다는 그냥 에러메시지
     GameNotFound(GroupKey),
     GameAlreadyStarted(GroupKey),
-    GameAlreadyFinished(GroupKey),
+    GameAlreadyFinished(GroupKey),  // unused
     GameInvalidCategoryName,
 }
 
@@ -37,6 +37,7 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+// TODO: debug mode일 때만 에러 변환
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         println!("->> {:<12} - {self:?}", "INTO_RES");
@@ -53,6 +54,9 @@ impl IntoResponse for Error {
         match self {
             Error::GameCommandParseFail(help_message) => {
                 template.add_output(SimpleText::new(help_message).build());
+            }
+            Error::GameNotFound(group_key) => {
+                template.add_output(SimpleText::new("게임중이 아니에요").build());
             }
             _ => {
                 template.add_output(SimpleText::new(format!("err: {self:?}").as_str()).build());
