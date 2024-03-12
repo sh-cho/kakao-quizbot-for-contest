@@ -90,8 +90,6 @@ impl GameManager {
         let current_quiz = game.current_quiz;
         
         game.current_round += 1;
-        // game.current_quiz = quiz_db().get_any_random_quiz();
-
         // category에 따라. 없는 카테고리면 랜덤하게
         // TODO: 한쪽으로 정리. 시작할 떄?
         if let Some(category) = &game.selected_category {
