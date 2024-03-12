@@ -6,7 +6,7 @@ use tracing::debug;
 use tracing_subscriber::EnvFilter;
 
 use crate::config::config;
-use crate::game::db::quiz_db;
+use crate::game::db::{flag_quiz_db, quiz_db};
 use crate::game::state::GameManager;
 
 pub use self::error::{Error, Result};
@@ -25,6 +25,7 @@ async fn main() -> Result<()> {
 
     debug!("{:<12} - initializing quiz local db", "MAIN");
     quiz_db();
+    flag_quiz_db();
 
     debug!("{:<12} - connecting to redis", "MAIN");
     let manager = RedisConnectionManager::new(config().REDIS_CONNECTION_STRING.as_str()).unwrap();

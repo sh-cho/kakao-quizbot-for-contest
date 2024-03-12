@@ -56,8 +56,9 @@ impl Command {
                     .map(|s| s.to_string());
 
                 // 유효하지 않은 카테고리
+                // "국기"는 OK
                 if let Some(ref category) = category {
-                    if !QUIZ_CATEGORIES.contains(category.as_str()) {
+                    if !QUIZ_CATEGORIES.contains(category.as_str()) && category != "국기" {
                         return None;
                     }
                 }

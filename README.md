@@ -2,10 +2,15 @@
 
 ### TODO
 
-- [ ] 카테고리 선택해서 시작하기
-- [ ] 다양한 말풍선
-- [ ] Redis connection pool 연결
+- [ ] x86 배포 좀 쉽게..
 - [ ] 문제 Timeout (30초?) with Event API
+  - 답 알려줘야됨
+- [ ] Refactoring
+- [ ] Redis connection pool 연결
+- [ ] 멀티 정답 (ex. 국기 문제에서 `["미국", "미합중국", ...]`)
+- [ ] 난이도 조절?
+- [x] 다양한 말풍선: SimpleImage
+- [x] 카테고리 선택해서 시작하기
 
 아직 생각중인 부분..
 

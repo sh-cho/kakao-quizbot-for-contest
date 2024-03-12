@@ -7,22 +7,13 @@ use phf::{phf_set, Set};
 
 use tracing::warn;
 
-use crate::game::model::Quiz;
+use crate::game::model::{FlagQuiz, Quiz};
 
 const QUIZ_DB_DIR: &str = "data";
 const QUIZ_DB_FILE: &str = "quiz.csv";
 
 // category should be pre-defined (for now)
 // TODO: csv 긁어올때 채우기? -> OnceLock?
-// pub const QUIZ_CATEGORIES: HashSet<&'static str> = {
-//     let mut set = HashSet::new();
-//     set.insert("상식");
-//     set.insert("넌센스");
-//     set.insert("고사성어");
-//     set
-// };
-
-// use phf
 pub static QUIZ_CATEGORIES: Set<&'static str> = phf_set! {
     "상식",
     "넌센스",
@@ -86,4 +77,59 @@ pub fn quiz_db() -> &'static QuizDB {
 
         QuizDB { quizzes }
     })
+}
+
+const FLAG_QUIZ_DB_DIR: &str = "data";
+const FLAG_QUIZ_DB_FILE: &str = "flags.csv";
+pub const FLAG_IMAGE_CDN_PATH: &str = "https://kakao-quizbot-cdn.joe-brothers.com/flags_640";  // TODO: move to runtime env
+pub const FLAG_IMAGE_EXT: &str = "png";
+
+// 복붙
+// TODO; quizdb도 trait으로 묶기 ㅠ
+pub struct FlagQuizDB {
+    quizzes: Vec<FlagQuiz>,
+}
+
+impl FlagQuizDB {
+    pub fn get_random_flag_quiz(&self) -> &FlagQuiz {
+        let mut rng = rand::thread_rng();
+        let index = rng.gen_range(0..self.quizzes.len());
+        &self.quizzes[index]
+    }
+}
+
+pub fn flag_quiz_db() -> &'static FlagQuizDB {
+    static INSTANCE: OnceLock<FlagQuizDB> = OnceLock::new();
+
+    INSTANCE.get_or_init(|| {
+        let current_dir = std::env::current_dir().unwrap();
+        let flag_quiz_db_file = current_dir.join(FLAG_QUIZ_DB_DIR).join(FLAG_QUIZ_DB_FILE);
+
+        let mut reader = csv::Reader::from_path(flag_quiz_db_file)
+            .expect("flag quiz db file not found");
+
+        let mut quizzes: Vec<FlagQuiz> = Vec::new();
+
+        for result in reader.deserialize() {
+            let record: FlagQuiz = match result {
+                Ok(record) => record,
+                Err(e) => {
+                    warn!("{:<12} - FlagQuiz load failed: {}", "GAME_DB", e);
+                    continue;
+                }
+            };
+            quizzes.push(record);
+        }
+
+        assert!(!quizzes.is_empty());
+
+        FlagQuizDB { quizzes }
+    })
+}
+
+// TODO: 더 깔끔하게
+#[derive(Clone)]
+pub enum QuizType {
+    Simple(Quiz),
+    Flag(FlagQuiz),
 }
