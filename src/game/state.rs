@@ -87,7 +87,7 @@ impl GameManager {
         *scores_by_user.entry(user_id.to_string()).or_insert(0) += 1;
         *scores_by_group.entry(group_key.clone()).or_insert(0) += 1;
 
-        let current_quiz = game.current_quiz.clone();
+        let current_quiz = game.current_quiz;
         
         game.current_round += 1;
         // game.current_quiz = quiz_db().get_any_random_quiz();
@@ -107,7 +107,7 @@ impl GameManager {
             user_id: user_id.to_string(),
             score: *scores_by_user.get(user_id).unwrap(),
             current_quiz,
-            next_quiz: game.current_quiz.clone(),
+            next_quiz: game.current_quiz,
             current_round: game.current_round,
         })
     }
