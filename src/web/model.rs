@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::game::db::QUIZ_CATEGORIES;
 
 /// bot proxy -> skill server payload
 /// skipped unused fields
@@ -36,7 +37,7 @@ pub enum ChatIdType {
 }
 
 pub enum Command {
-    Start,
+    Start(Option<String>),
     Stop,
     Answer(String),
     Ranking,
@@ -48,7 +49,21 @@ impl Command {
         let command = utterance.splitn(2, ' ').next()?;
 
         match command {
-            "시작" => Some(Command::Start),
+            "시작" => {
+                // 카테고리는 있을 수도 있고 없을 수도 있다
+                let category = utterance.splitn(2, ' ')
+                    .nth(1)
+                    .map(|s| s.to_string());
+
+                // 유효하지 않은 카테고리
+                if let Some(ref category) = category {
+                    if !QUIZ_CATEGORIES.contains(category.as_str()) {
+                        return None;
+                    }
+                }
+
+                Some(Command::Start(category))
+            }
             "중지" | "중단" | "정지" | "종료" | "그만" | "멈춰" => Some(Command::Stop),
             // TODO: "정답" 명령어를 사용하지 않고, 바로 답 입력하도록 ?
             "정답" => {

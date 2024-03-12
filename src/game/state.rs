@@ -20,7 +20,7 @@ use tokio::sync::RwLock;
 
 use crate::{Error, Result};
 use crate::conn::RedisConnectionPool;
-use crate::game::db::quiz_db;
+use crate::game::db::{QUIZ_CATEGORIES, quiz_db};
 use crate::game::model::Quiz;
 use crate::game::temp_inmemory_db::{SCORES_BY_GROUP, SCORES_BY_USER};
 
@@ -47,9 +47,9 @@ impl GameManager {
         })
     }
 
-    pub async fn start_game(&self, group_key: GroupKey) -> Result<Game> {
+    pub async fn start_game(&self, group_key: GroupKey, category_name: Option<String>) -> Result<Game> {
         let mut games = self.games.write().await;
-        let game = Game::new(group_key.clone());
+        let game = Game::new(group_key.clone(), category_name);
 
         let prev = games.insert(group_key.clone(), Mutex::new(game.clone()));
         match prev {
@@ -58,6 +58,10 @@ impl GameManager {
         }
     }
 
+    // fn is_valid_category(&self, category_name: &String) -> bool {
+    //     QUIZ_CATEGORIES.contains(category_name)
+    // }
+
     pub async fn stop_game(&self, group_key: GroupKey) -> Result<()> {
         let mut games = self.games.write().await;
         games.remove(&group_key)
@@ -65,8 +69,7 @@ impl GameManager {
 
         Ok(())
     }
-    
-    
+
     pub async fn try_answer_inmemory(&self, user_id: &str, group_key: &GroupKey, answer: &str) -> Result<AnswerResult> {
         let games = self.games.read().await;
         let game = games.get(group_key)
@@ -84,10 +87,17 @@ impl GameManager {
         *scores_by_user.entry(user_id.to_string()).or_insert(0) += 1;
         *scores_by_group.entry(group_key.clone()).or_insert(0) += 1;
 
-        let current_quiz = game.current_quiz.clone();
+        let current_quiz = game.current_quiz;
         
         game.current_round += 1;
-        game.current_quiz = quiz_db().get_random_quiz();
+        // category에 따라. 없는 카테고리면 랜덤하게
+        // TODO: 한쪽으로 정리. 시작할 떄?
+        if let Some(category) = &game.selected_category {
+            game.current_quiz = quiz_db().get_random_quiz_by_category(category)
+                .unwrap_or(quiz_db().get_any_random_quiz());
+        } else {
+            game.current_quiz = quiz_db().get_any_random_quiz();
+        }
 
         // TODO: rank
         
@@ -95,7 +105,7 @@ impl GameManager {
             user_id: user_id.to_string(),
             score: *scores_by_user.get(user_id).unwrap(),
             current_quiz,
-            next_quiz: game.current_quiz.clone(),
+            next_quiz: game.current_quiz,
             current_round: game.current_round,
         })
     }
@@ -186,14 +196,16 @@ pub struct Game {
     group_key: GroupKey,
     pub current_round: u8,
     pub current_quiz: &'static Quiz,
+    pub selected_category: Option<String>,  // 없으면 all random
 }
 
 impl Game {
-    pub fn new(group_key: GroupKey) -> Self {
+    pub fn new(group_key: GroupKey, selected_category: Option<String>) -> Self {
         Self {
             group_key,
             current_round: 1,
-            current_quiz: quiz_db().get_random_quiz(),
+            current_quiz: quiz_db().get_any_random_quiz(),
+            selected_category,
         }
     }
 }

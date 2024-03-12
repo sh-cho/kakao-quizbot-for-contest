@@ -26,6 +26,7 @@ pub enum Error {
     GameNotFound(GroupKey),
     GameAlreadyStarted(GroupKey),
     GameAlreadyFinished(GroupKey),
+    GameInvalidCategoryName,
 }
 
 impl std::fmt::Display for Error {

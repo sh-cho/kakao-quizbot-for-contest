@@ -29,14 +29,14 @@ async fn main() -> Result<()> {
     debug!("{:<12} - connecting to redis", "MAIN");
     let manager = RedisConnectionManager::new(config().REDIS_CONNECTION_STRING.as_str()).unwrap();
     let pool = Pool::builder().build(manager).await.unwrap();
-    {
-        // ping the database before starting
-        let mut conn = pool.get().await.unwrap();
-        conn.set::<&str, &str, ()>("foo", "bar").await.unwrap();
-        let result: String = conn.get("foo").await.unwrap();
-        assert_eq!(result, "bar");
-    }
-    debug!("{:<12} - successfully connected to redis and pinged it", "MAIN");
+    // {
+    //     // ping the database before starting
+    //     let mut conn = pool.get().await.unwrap();
+    //     conn.set::<&str, &str, ()>("foo", "bar").await.unwrap();
+    //     let result: String = conn.get("foo").await.unwrap();
+    //     assert_eq!(result, "bar");
+    // }
+    // debug!("{:<12} - successfully connected to redis and pinged it", "MAIN");
 
     let gm = GameManager::new(pool.clone()).unwrap();
     let app = Router::new()
