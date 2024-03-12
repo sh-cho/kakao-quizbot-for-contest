@@ -33,16 +33,17 @@ pub async fn bot_request(
 
     let utterance = payload.user_request.utterance;
     let command = Command::from_utterance(&utterance)
-        .ok_or(Error::GameCommandParseFail("🗒️ 명령어 목록
-- 시작
+        .ok_or(Error::GameCommandParseFail(r#"🗒️ 명령어 목록
+- 시작 [카테고리]: 카테고리를 입력하지 않으면 전체 문제를 대상으로 출제됩니다.
+  (사용 가능 카테고리: 상식, 넌센스, 고사성어)
 - 중지
 - 정답 OOO
-- 랭킹(🚧)"))?;
+- 랭킹(🚧)"#))?;
 
     let mut response = Template::new();
     match command {
-        Command::Start => {
-            let game = gm.start_game(chat_id).await?;
+        Command::Start(category) => {
+            let game = gm.start_game(chat_id, category).await?;
             response.add_output(SimpleText::new(game.current_quiz.info_before(game.current_round)).build());
         }
         Command::Stop => {

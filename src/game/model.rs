@@ -3,7 +3,7 @@ use crate::game;
 
 #[derive(Debug, Deserialize)]
 pub struct Quiz {
-    category: String,
+    pub category: String,
     question: String,
     pub answer: String,
     pub comment: Option<String>,
