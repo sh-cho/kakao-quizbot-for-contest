@@ -1,5 +1,15 @@
 ## kakao-quizbot
 
+### Instructions
+```sh
+rustup target add x86_64-unknown-linux-gnu
+brew tap SergioBenitez/osxct
+
+cargo build --release --target x86_64-unknown-linux-gnu
+scp target/x86_64-unknown-linux-gnu/release/kakao-quizbot ~~~
+```
+Build for x86 on m1 mac
+
 ### TODO
 
 - [ ] x86 배포 좀 쉽게..

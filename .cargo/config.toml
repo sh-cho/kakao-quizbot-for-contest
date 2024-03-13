@@ -5,3 +5,6 @@ RUST_LOG="kakao_quizbot=debug"
 PRESHARED_AUTH_HEADER_KEY="X-TEMP-HEADER"
 PRESHARED_AUTH_HEADER_VALUE="abde"
 REDIS_CONNECTION_STRING="redis://:VINCE_JJANG@127.0.0.1:6379/"
+
+[target.x86_64-unknown-linux-gnu]
+linker = "/opt/homebrew/bin/x86_64-unknown-linux-gnu-gcc"
