@@ -54,3 +54,22 @@ impl FlagQuiz {
         format!("{}/{}.{}", FLAG_IMAGE_CDN_PATH, self.country_code_alpha_2, FLAG_IMAGE_EXT)
     }
 }
+
+
+pub trait QuizTrait {
+    // TODO: info ?
+    
+    fn get_answer(&self) -> &str;
+}
+
+impl QuizTrait for Quiz {
+    fn get_answer(&self) -> &str {
+        &self.answer
+    }
+}
+
+impl QuizTrait for FlagQuiz {
+    fn get_answer(&self) -> &str {
+        &self.answer
+    }
+}

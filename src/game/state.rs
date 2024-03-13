@@ -13,10 +13,12 @@
 //! ZRANK
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::time::Duration;
 
 use redis::AsyncCommands;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, Notify, RwLock};
+use tokio::time::timeout;
 use tracing::debug;
 
 use crate::{Error, Result};
@@ -34,10 +36,12 @@ const REDIS_GROUP_SCORES_KEY: &str = "group_scores";
 #[derive(Clone)]
 pub struct GameManager {
     games: Arc<RwLock<HashMap<GroupKey, Mutex<Game>>>>,
-    
+
     // pool: RedisConnectionPool,  // to-be-done
-    
+
     // for now, just use static
+
+    pub http_client: reqwest::Client,
 }
 
 impl GameManager {
@@ -45,6 +49,7 @@ impl GameManager {
         Ok(Self {
             games: Arc::new(RwLock::new(HashMap::new())),
             // pool,
+            http_client: reqwest::Client::new(),
         })
     }
 
@@ -76,8 +81,8 @@ impl GameManager {
         let games = self.games.read().await;
         let game = games.get(group_key)
             .ok_or(Error::GameNotFound(group_key.clone()))?;
-        
-        let mut game = game.lock().unwrap();
+
+        let mut game = game.blocking_lock();
         let is_correct = match &game.current_quiz {  // 으아악
             QuizType::Simple(quiz) => quiz.is_correct_answer(answer),
             QuizType::Flag(flag_quiz) => flag_quiz.is_correct_answer(answer),
@@ -85,23 +90,23 @@ impl GameManager {
         if !is_correct {
             return Ok(AnswerResult::Wrong);
         }
-        
+
         // scores
         let mut scores_by_user = SCORES_BY_USER.lock().unwrap();
         let mut scores_by_group = SCORES_BY_GROUP.lock().unwrap();
-        
+
         *scores_by_user.entry(user_id.to_string()).or_insert(0) += 1;
         *scores_by_group.entry(group_key.clone()).or_insert(0) += 1;
 
         let current_quiz = game.current_quiz.clone();
-        
+
         game.current_round += 1;
         // category에 따라. 없는 카테고리면 랜덤하게
         // TODO: 한쪽으로 정리. 시작할 떄?
         if let Some(category) = &game.selected_category {
             // game.current_quiz = quiz_db().get_random_quiz_by_category(category)
             //     .unwrap_or(quiz_db().get_any_random_quiz());
-            
+
             // 국기인 경우에는 국기 문제만
             if category == "국기" {
                 game.current_quiz = QuizType::Flag(flag_quiz_db().get_random_flag_quiz().clone());
@@ -116,7 +121,7 @@ impl GameManager {
         }
 
         // TODO: rank
-        
+
         Ok(AnswerResult::Correct {
             user_id: user_id.to_string(),
             score: *scores_by_user.get(user_id).unwrap(),
@@ -125,7 +130,7 @@ impl GameManager {
             current_round: game.current_round,
         })
     }
-    
+
     // region: redis (TODO)
     // // TODO: race cond?
     // pub async fn try_answer_with_redis(&self, user_id: String, group_key: GroupKey, answer: String) -> Result<AnswerResult> {
@@ -198,8 +203,75 @@ impl GameManager {
         //     .map_err(|_| Error::RedisCommandFail(REDIS_GROUP_SCORES_KEY.to_string()))?;
         // 
         // Ok((user_rank, group_rank))
-        
+
         Ok((123, 123))
+    }
+
+    pub async fn submit_answer(&self, game_id: String) {
+        let games = self.games.write().await;
+        let game = games.get(&game_id).unwrap().blocking_lock();
+
+        // Notify the waiting task.
+        game.answer_submitted.notify_one();
+    }
+
+    pub async fn wait_for_answer(&self, game_id: String) -> std::result::Result<(), tokio::time::error::Elapsed> {
+        let games = self.games.read().await;
+        let game = games.get(&game_id).unwrap().blocking_lock();
+
+        // Wait for the answer to be submitted or for the timeout to expire.
+        timeout(
+            Duration::from_secs(MAX_TIMEOUT_SECONDS),
+            game.answer_submitted.notified(),
+        ).await?;
+
+        Ok(())
+    }
+
+    // 현재 라운드의 답을 반환하고, 다음 라운드로 넘어가기 (아무도 라운드 못 풀었을 때용)
+    // return: (current_quiz, next_quiz, next_round)
+    pub async fn get_current_quiz_and_move_next(&self, group_key: GroupKey) -> Result<(QuizType, QuizType, u8)> {
+        let games = self.games.read().await;
+        let game = games.get(group_key.as_str())
+            .ok_or(Error::GameNotFound(group_key.clone()))?;
+
+
+        let mut game = game.blocking_lock();
+        let current_quiz = game.current_quiz.clone();
+
+        // game.current_round += 1;
+        // game.current_quiz = quiz_db().get_any_random_quiz().clone();
+        // 
+        // Ok((current_quiz, &game.current_quiz, game.current_round))
+
+        // TODO: duplicated
+        game.current_round += 1;
+        // category에 따라. 없는 카테고리면 랜덤하게
+        // TODO: 한쪽으로 정리. 시작할 떄?
+        if let Some(category) = &game.selected_category {
+            // game.current_quiz = quiz_db().get_random_quiz_by_category(category)
+            //     .unwrap_or(quiz_db().get_any_random_quiz());
+
+            // 국기인 경우에는 국기 문제만
+            if category == "국기" {
+                game.current_quiz = QuizType::Flag(flag_quiz_db().get_random_flag_quiz().clone());
+            } else {
+                let next_quiz = quiz_db().get_random_quiz_by_category(category)
+                    .unwrap_or(quiz_db().get_any_random_quiz());
+
+                game.current_quiz = QuizType::Simple(next_quiz.clone());
+            }
+        } else {
+            game.current_quiz = QuizType::Simple(quiz_db().get_any_random_quiz().clone());
+        }
+
+        Ok((current_quiz, game.current_quiz.clone(), game.current_round))
+    }
+
+    // 게임이 존재하는지 여부 확인
+    pub async fn is_game_exists(&self, group_key: &GroupKey) -> bool {
+        let games = self.games.read().await;
+        games.contains_key(group_key)
     }
 }
 
@@ -208,6 +280,7 @@ impl GameManager {
 // 굳이 남겨놓지 않는게 좋을듯.
 // pub const MAX_ROUNDS: u8 = 10;
 pub const MAX_ROUNDS: u8 = 3;
+pub const MAX_TIMEOUT_SECONDS: u64 = 60;
 
 #[derive(Clone)]
 pub struct Game {
@@ -215,7 +288,10 @@ pub struct Game {
     pub current_round: u8,
     // pub current_quiz: &'static Quiz,
     pub current_quiz: QuizType,
-    pub selected_category: Option<String>,  // 없으면 all random
+    pub selected_category: Option<String>,
+    // 없으면 all random
+
+    answer_submitted: Arc<Notify>,  // 누군가 정답을 맞췄을 떄
 }
 
 impl Game {
@@ -229,6 +305,7 @@ impl Game {
                 QuizType::Simple(quiz_db().get_any_random_quiz().clone())
             },
             selected_category,
+            answer_submitted: Arc::new(Notify::new()),
         }
     }
 }

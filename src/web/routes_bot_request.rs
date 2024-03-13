@@ -4,13 +4,14 @@ use axum::routing::post;
 use kakao_rs::prelude::{BasicCard, SimpleImage, SimpleText, Template};
 use tracing::debug;
 
-use crate::web::model::Command;
-
 use crate::{Error, game, Result};
+use crate::config::config;
 use crate::game::db::QuizType;
+use crate::game::model::QuizTrait;
 use crate::game::state::GameManager;
 use crate::web::model::BotRequest;
 use crate::web::model::ChatIdType::BotGroupKey;
+use crate::web::model::Command;
 
 pub fn routes(
     gm: GameManager,
@@ -45,7 +46,7 @@ pub async fn bot_request(
     match command {
         Command::Start(category) => {
             let is_flag_quiz = category.as_deref() == Some("국기");
-            let game = gm.start_game(chat_id, category, is_flag_quiz).await?;
+            let game = gm.start_game(chat_id.clone(), category, is_flag_quiz).await?;
 
             // todo: extract
             match &game.current_quiz {
@@ -61,13 +62,68 @@ pub async fn bot_request(
                     //         .set_thumbnail(quiz.image_url())
                     //     .build()
                     // )
-                    
+
                     response.add_output(SimpleImage::new(quiz.image_url(), quiz.country_code_alpha_2.clone()).build());
                     response.add_output(SimpleText::new(quiz.info_before(game.current_round)).build());
-                    // 임시로 답도 알려준다.
-                    response.add_output(SimpleText::new(format!("빈스 치트 - {}", quiz.answer.clone())).build());
+                    // response.add_output(SimpleText::new(format!("빈스 치트 - {}", quiz.answer.clone())).build());
+
+                    debug!("->> {:<12} - bot_request - start - chat: {}, answer: {}", "HANDLER", chat_id, quiz.answer);
                 }
             }
+
+            tokio::spawn(async move {
+                match gm.wait_for_answer(chat_id.clone()).await {
+                    Ok(_) => {
+                        // no-op
+                        debug!("->> {:<12} - bot_request - wait_for_answer - solved({})", "ASYNC_HANDLER", chat_id);
+                    }
+                    Err(_) => {  // no one solved
+                        if !gm.is_game_exists(&chat_id).await {
+                            // ended already
+                            return;
+                        }
+
+                        // 지금 퀴즈 답 알려주고, 다음 퀴즈로 넘어가기 (using Event API)
+                        // response 말고, 별도 endpoint로 보냄 (using reqwest)
+                        // Use gm.http_client
+                        // assume current quiz type is same as next quiz type
+                        let (current_quiz, next_quiz, next_round) = gm.get_current_quiz_and_move_next(chat_id.clone()).await.unwrap();
+                        let mut async_res = Template::new();
+                        match (&current_quiz, &next_quiz) {
+                            (QuizType::Simple(cq), QuizType::Simple(nq)) => {
+                                async_res.add_output(SimpleText::new(format!(r#"🔔 시간 초과! 정답은 "{}""#, cq.get_answer())).build());
+                                if next_round > game::state::MAX_ROUNDS {
+                                    async_res.add_output(SimpleText::new("✅ 다 풀었습니다 :)").build());
+                                } else {
+                                    async_res.add_output(SimpleText::new(nq.info_before(next_round)).build());
+                                }
+                            }
+                            (QuizType::Flag(cq), QuizType::Flag(nq)) => {
+                                async_res.add_output(SimpleText::new(format!(r#"?? 시간 초과! 정답은 "{}""#, cq.get_answer())).build());
+                                if next_round > game::state::MAX_ROUNDS {
+                                    async_res.add_output(SimpleText::new("✅ 다 풀었습니다 :)").build());
+                                } else {
+                                    async_res.add_output(SimpleImage::new(nq.image_url(), nq.country_code_alpha_2.clone()).build());
+                                    async_res.add_output(SimpleText::new(nq.info_before(next_round)).build());
+                                }
+                            }
+                            _ => {
+                                // 로깅만
+                                debug!("->> {:<12} - bot_request - wait_for_answer - unexpected quiz type({})", "ASYNC_HANDLER", chat_id);
+                            }
+                        }
+
+                        // for test
+                        debug!("->> {:<12} - bot_request - wait_for_answer - timeout({})", "ASYNC_HANDLER", chat_id);
+
+                        gm.http_client
+                            .post(format!("https://bot-api.kakao.com/v2/bots/{}/talk", &config().BOT_ID))
+                            .header("Authorization", format!("{} {}", &config().EVENT_API_PREFIX, &config().EVENT_API_KEY))
+                            .json(&async_res)
+                            .send().await.unwrap();
+                    }
+                }
+            });
         }
         Command::Stop => {
             gm.stop_game(chat_id).await?;
@@ -101,7 +157,7 @@ pub async fn bot_request(
 
                     if current_round > game::state::MAX_ROUNDS {
                         response.add_output(SimpleText::new("✅ 다 풀었습니다 :)").build());
-                        gm.stop_game(chat_id).await?;
+                        gm.stop_game(chat_id.clone()).await?;
                     } else {
                         // TODO: extract
                         match &next_quiz {
@@ -117,6 +173,9 @@ pub async fn bot_request(
                             }
                         }
                     }
+
+                    // Mark the answer as submitted.
+                    gm.submit_answer(chat_id.clone()).await;
                 }
                 game::state::AnswerResult::Wrong => {
                     // no-op

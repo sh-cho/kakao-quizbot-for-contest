@@ -17,6 +17,9 @@ pub struct Config {
     pub PRESHARED_AUTH_HEADER_KEY: String,
     pub PRESHARED_AUTH_HEADER_VALUE: String,
     pub REDIS_CONNECTION_STRING: String,
+    pub EVENT_API_KEY: String,
+    pub EVENT_API_PREFIX: String,
+    pub BOT_ID: String,
 }
 
 impl Config {
@@ -25,6 +28,9 @@ impl Config {
             PRESHARED_AUTH_HEADER_KEY: get_env("PRESHARED_AUTH_HEADER_KEY")?,
             PRESHARED_AUTH_HEADER_VALUE: get_env("PRESHARED_AUTH_HEADER_VALUE")?,
             REDIS_CONNECTION_STRING: get_env("REDIS_CONNECTION_STRING")?,
+            EVENT_API_KEY: get_env("EVENT_API_KEY")?,
+            EVENT_API_PREFIX: get_env("EVENT_API_PREFIX")?,
+            BOT_ID: get_env("BOT_ID")?,
         })
     }
 }
