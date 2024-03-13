@@ -82,7 +82,7 @@ impl GameManager {
         let game = games.get(group_key)
             .ok_or(Error::GameNotFound(group_key.clone()))?;
 
-        let mut game = game.lock().await;
+        let mut game = game.blocking_lock();
         let is_correct = match &game.current_quiz {  // 으아악
             QuizType::Simple(quiz) => quiz.is_correct_answer(answer),
             QuizType::Flag(flag_quiz) => flag_quiz.is_correct_answer(answer),
@@ -209,7 +209,7 @@ impl GameManager {
 
     pub async fn submit_answer(&self, game_id: String) {
         let games = self.games.write().await;
-        let game = games.get(&game_id).unwrap().lock().await;
+        let game = games.get(&game_id).unwrap().blocking_lock();
 
         // Notify the waiting task.
         game.answer_submitted.notify_one();
@@ -217,7 +217,7 @@ impl GameManager {
 
     pub async fn wait_for_answer(&self, game_id: String) -> std::result::Result<(), tokio::time::error::Elapsed> {
         let games = self.games.read().await;
-        let game = games.get(&game_id).unwrap().lock().await;
+        let game = games.get(&game_id).unwrap().blocking_lock();
 
         // Wait for the answer to be submitted or for the timeout to expire.
         timeout(
@@ -236,7 +236,7 @@ impl GameManager {
             .ok_or(Error::GameNotFound(group_key.clone()))?;
 
 
-        let mut game = game.lock().await;
+        let mut game = game.blocking_lock();
         let current_quiz = game.current_quiz.clone();
 
         // game.current_round += 1;

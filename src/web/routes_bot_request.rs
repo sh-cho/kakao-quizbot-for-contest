@@ -114,7 +114,7 @@ pub async fn bot_request(
                         }
 
                         // for test
-                        debug!("->> {:<12} - bot_request - wait_for_answer - timeout({}), template: {:?}", "ASYNC_HANDLER", chat_id, async_res);
+                        debug!("->> {:<12} - bot_request - wait_for_answer - timeout({})", "ASYNC_HANDLER", chat_id);
 
                         gm.http_client
                             .post(format!("https://bot-api.kakao.com/v2/bots/{}/talk", &config().BOT_ID))
