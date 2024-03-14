@@ -9,7 +9,9 @@ use tracing::warn;
 
 use crate::game::model::{FlagQuiz, Quiz};
 
-const QUIZ_DB_DIR: &str = "data";
+// const QUIZ_DB_DIR: &str = "data";
+// 임시로 배포용으로 절대경로 넣기
+const QUIZ_DB_DIR: &str = "/home/deploy/data";
 const QUIZ_DB_FILE: &str = "quiz.csv";
 
 // category should be pre-defined (for now)
@@ -79,7 +81,8 @@ pub fn quiz_db() -> &'static QuizDB {
     })
 }
 
-const FLAG_QUIZ_DB_DIR: &str = "data";
+// const FLAG_QUIZ_DB_DIR: &str = "data";
+const FLAG_QUIZ_DB_DIR: &str = QUIZ_DB_DIR;
 const FLAG_QUIZ_DB_FILE: &str = "flags.csv";
 pub const FLAG_IMAGE_CDN_PATH: &str = "https://kakao-quizbot-cdn.joe-brothers.com/flags_640";  // TODO: move to runtime env
 pub const FLAG_IMAGE_EXT: &str = "png";
