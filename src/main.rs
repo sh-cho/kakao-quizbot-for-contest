@@ -16,6 +16,7 @@ mod error;
 mod config;
 mod game;
 mod conn;
+mod skill;
 
 #[tokio::main]
 async fn main() -> Result<()> {

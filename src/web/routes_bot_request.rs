@@ -9,6 +9,7 @@ use crate::web::model::Command;
 use crate::{Error, game, Result};
 use crate::game::db::QuizType;
 use crate::game::state::GameManager;
+use crate::skill::{Extra, Mention, TemplateWithExtra};
 use crate::web::model::BotRequest;
 use crate::web::model::ChatIdType::BotGroupKey;
 
@@ -23,7 +24,7 @@ pub fn routes(
 pub async fn bot_request(
     State(gm): State<GameManager>,
     Json(payload): Json<BotRequest>,
-) -> Result<Json<Template>> {
+) -> Result<Json<TemplateWithExtra>> {
     debug!("{:<12} - bot_request", "HANDLER");
 
     let user_id = payload.user_request.user.id;
@@ -41,7 +42,9 @@ pub async fn bot_request(
 - 정답 OOO
 - 랭킹(🚧)"#))?;
 
-    let mut response = Template::new();
+    let mut template = Template::new();
+    let mut extra: Option<Extra> = None;
+
     match command {
         Command::Start(category) => {
             let is_flag_quiz = category.as_deref() == Some("국기");
@@ -50,7 +53,7 @@ pub async fn bot_request(
             // todo: extract
             match &game.current_quiz {
                 QuizType::Simple(quiz) => {
-                    response.add_output(SimpleText::new(quiz.info_before(game.current_round)).build());
+                    template.add_output(SimpleText::new(quiz.info_before(game.current_round)).build());
                 }
                 QuizType::Flag(quiz) => {
                     // BasicCard -> 이미지 비율이 제한적이라 안쓰는걸루
@@ -61,17 +64,17 @@ pub async fn bot_request(
                     //         .set_thumbnail(quiz.image_url())
                     //     .build()
                     // )
-                    
-                    response.add_output(SimpleImage::new(quiz.image_url(), quiz.country_code_alpha_2.clone()).build());
-                    response.add_output(SimpleText::new(quiz.info_before(game.current_round)).build());
+
+                    template.add_output(SimpleImage::new(quiz.image_url(), quiz.country_code_alpha_2.clone()).build());
+                    template.add_output(SimpleText::new(quiz.info_before(game.current_round)).build());
                     // 임시로 답도 알려준다.
-                    response.add_output(SimpleText::new(format!("빈스 치트 - {}", quiz.answer.clone())).build());
+                    // template.add_output(SimpleText::new(format!("빈스 치트 - {}", quiz.answer.clone())).build());
                 }
             }
         }
         Command::Stop => {
             gm.stop_game(chat_id).await?;
-            response.add_output(SimpleText::new("🔴 퀴즈게임이 종료되었습니다.").build());
+            template.add_output(SimpleText::new("🔴 퀴즈게임이 종료되었습니다.").build());
         }
         Command::Answer(answer) => {
             let result = gm.try_answer_inmemory(&user_id, &chat_id, &answer).await?;
@@ -84,7 +87,14 @@ pub async fn bot_request(
                     current_round
                 } => {
                     // TODO: hash -> nickname?
-                    let mut result_text = format!("👏 {:.6} 정답! (누적 점수: {})", user_id, score);
+                    // let mut result_text = format!("👏 {:.6} 정답! (누적 점수: {})", user_id, score);
+                    let mut result_text = format!(r#"👏 {{#mentions.user}} 정답! (누적 점수: {})"#, score);
+                    extra = Some(Extra {
+                        mentions: vec![("user".to_string(), Mention {
+                            mention_type: "botUserKey".to_string(),
+                            id: user_id,
+                        })].into_iter().collect(),
+                    });
 
                     match &current_quiz {
                         QuizType::Simple(quiz) => {
@@ -97,20 +107,20 @@ pub async fn bot_request(
                         }
                     }
 
-                    response.add_output(SimpleText::new(result_text).build());
+                    template.add_output(SimpleText::new(result_text).build());
 
                     if current_round > game::state::MAX_ROUNDS {
-                        response.add_output(SimpleText::new("✅ 다 풀었습니다 :)").build());
+                        template.add_output(SimpleText::new("✅ 다 풀었습니다 :)").build());
                         gm.stop_game(chat_id).await?;
                     } else {
                         // TODO: extract
                         match &next_quiz {
                             QuizType::Simple(quiz) => {
-                                response.add_output(SimpleText::new(quiz.info_before(current_round)).build());
+                                template.add_output(SimpleText::new(quiz.info_before(current_round)).build());
                             }
                             QuizType::Flag(quiz) => {
-                                response.add_output(SimpleImage::new(quiz.image_url(), quiz.country_code_alpha_2.clone()).build());
-                                response.add_output(SimpleText::new(quiz.info_before(current_round)).build());
+                                template.add_output(SimpleImage::new(quiz.image_url(), quiz.country_code_alpha_2.clone()).build());
+                                template.add_output(SimpleText::new(quiz.info_before(current_round)).build());
                                 // 임시로 답도 알려준다.
                                 // response.add_output(SimpleText::new(format!("빈스 치트 - {}", quiz.answer.clone())).build());
                                 // outputs는 3개까지....
@@ -128,9 +138,12 @@ pub async fn bot_request(
             // let (user_rank, chat_rank) = gm.get_ranking(&user_id, &chat_id).await?;
             // response.add_output(SimpleText::new(format!("당신의 순위: {}등\n이 방의 순위: {}등", user_rank, chat_rank)).build());
 
-            response.add_output(SimpleText::new("🚧 공사중").build());
+            template.add_output(SimpleText::new("🚧 공사중").build());
         }
     }
 
-    Ok(Json(response))
+    Ok(Json(TemplateWithExtra {
+        template,
+        extra,
+    }))
 }
