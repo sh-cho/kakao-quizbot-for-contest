@@ -187,3 +187,4 @@ target/
 # End of https://www.toptal.com/developers/gitignore/api/rust,jetbrains,macos,visualstudiocode
 
 data/
+deploy.sh

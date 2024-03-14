@@ -88,7 +88,7 @@ pub async fn bot_request(
                 } => {
                     // TODO: hash -> nickname?
                     // let mut result_text = format!("👏 {:.6} 정답! (누적 점수: {})", user_id, score);
-                    let mut result_text = format!(r#"👏 {{#mentions.user}} 정답! (누적 점수: {})"#, score);
+                    let mut result_text = format!(r#"👏 {{{{#mentions.user}}}} 정답! (누적 점수: {})"#, score);
                     extra = Some(Extra {
                         mentions: vec![("user".to_string(), Mention {
                             mention_type: "botUserKey".to_string(),
@@ -142,8 +142,12 @@ pub async fn bot_request(
         }
     }
 
-    Ok(Json(TemplateWithExtra {
+    let template_with_extra = TemplateWithExtra {
         template,
         extra,
-    }))
+    };
+
+    debug!("{:<12} - response: {:?}", "HANDLER", template_with_extra);
+
+    Ok(Json(template_with_extra))
 }
