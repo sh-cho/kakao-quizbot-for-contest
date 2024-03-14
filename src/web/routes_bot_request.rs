@@ -142,8 +142,12 @@ pub async fn bot_request(
         }
     }
 
-    Ok(Json(TemplateWithExtra {
+    let template_with_extra = TemplateWithExtra {
         template,
         extra,
-    }))
+    };
+
+    debug!("{:<12} - response: {:?}", "HANDLER", template_with_extra);
+
+    Ok(Json(template_with_extra))
 }
