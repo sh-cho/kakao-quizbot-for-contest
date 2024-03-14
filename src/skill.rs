@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TemplateWithExtra {
+    #[serde(flatten)]
     pub template: Template,
+    
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra: Option<Extra>,
 }
