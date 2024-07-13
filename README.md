@@ -1,5 +1,10 @@
 ## kakao-quizbot
 
+<p>
+  <img src="https://github.com/user-attachments/assets/9ff5c0d1-413e-467e-98a0-70f298af5f4b" alt="Text quiz example" width="300"/>
+  <img src="https://github.com/user-attachments/assets/379ba849-24bf-444f-8ea7-d3b9187f77f8" alt="Flag quiz example" width="300"/>
+</p>
+
 ### Instructions
 ```sh
 rustup target add x86_64-unknown-linux-gnu
